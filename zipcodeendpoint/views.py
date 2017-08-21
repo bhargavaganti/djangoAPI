@@ -1,50 +1,54 @@
-from django.shortcuts import render
-from django.http import HttpResponse, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework import generics
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.renderers import JSONRenderer
+from django.http import Http404
+
 from zipcodeendpoint.serializers import ZipAdjacencySerializer
 from zipcodeendpoint.models import ZipAdjacency
+from rest_framework import mixins 
+from rest_framework import generics
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework import permissions
+
+
 # Create your views here.
 def index(requests):
 	return HttpResponse("Hello, world. you are on the index page")
 
-@csrf_exempt
-def zipcode_list(request):
-	if request.method == 'GET':
-		zipcodes = ZipAdjacency.objects.all()
-		serializer = ZipAdjacencySerializer(zipcodes, many=True)
-		return JsonResponse(serializer.data, safe=False)
-	elif request.method == 'POST':
-		data = JSONParser().parse(request)
-		serializer = ZipAdjacencySerializer(data=data)
-		if serializer.is_valid():
-			serializer.save()
-			return JsonResponse(serializer.data, status=201)
-		return JsonResponse(serializer.errors, status=400)
+class ZipcodeList(mixins.ListModelMixin,
+	mixins.CreateModelMixin,
+	generics.GenericAPIView):
+	lookup_field = 'zip_code'
+	lookup_url_kwarg = 'zip_code'
+	#queryset = ZipAdjacency.objects.all() #.filter(zip_code= "{}".format(args.zip_code))
+	serializer_class = ZipAdjacencySerializer
+
+	def get_queryset(self):
+		zip_code= self.kwargs.get(self.lookup_url_kwarg)
+		queryset = ZipAdjacency.objects.filter(zip_code=zip_code)
+		return queryset
+
+	def get(self, request, *args, **kwargs):
+		return self.list(request, *args, **kwargs)
+
+	def post(self, request, *args, **kwargs):
+		return self.create(request, *args, **kwargs)
+
+class ZipcodeDetail(mixins.RetrieveModelMixin,
+	mixins.UpdateModelMixin,
+	mixins.DestroyModelMixin,
+	generics.GenericAPIView):
+	queryset = ZipAdjacency.objects.all()
+	serializer_class = ZipAdjacencySerializer
+
+	def get(self, request, *args, **kwargs):
+		return self.retrieve(request, *args, **kwargs)
+
+	def put(self, request, *args, **kwargs):
+		return self.update(request, *args, **kwargs)
+
+	def delete(slef, request, *args, **kwargs):
+		return slef.destroy(request, *args, **kwargs)
 
 
-@csrf_exempt
-def zipcode_detail(request, pk):
-	try:
-		zipcode = ZipAdjacency.objects.get(pk=pk)
-	except ZipAdjacency.DoesNotExist:
-		return HttpResponse(status=404)
-
-	if request.method == 'PUT':
-		data = JSONParser().parse(request)
-		serializer = ZipAdjacencySerializer(zipcode, data=data)
-		if serializer.is_valid():
-			serializer.save()
-			return JsonResponse(serializer.data)
-		return JsonResponse(serializer.errors, status=400)
-	elif request.method == 'DELETE':
-		zipcode.delete()
-		return HttpResponse(status=204)
-
-#class ZipList(generics.ListCreateAPIView):
-#	queryset = ZipAdjacency.objects.all()
-#	serializer_class = ZipAdjacencySerializer
-
-#class ZipDetail(generics.RetrieveUpdateDestroyAPIView):
-#	queryset = ZipAdjacency.objects.all()
-#	serializer_class = ZipAdjacencySerializer
